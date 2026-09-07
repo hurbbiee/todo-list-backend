@@ -3,9 +3,9 @@ package users
 import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/hurbbiee/todo-list-backend/internal/config"
-	"github.com/hurbbiee/todo-list-backend/internal/modules/users/delivery/http"
-	"github.com/hurbbiee/todo-list-backend/internal/modules/users/repository"
-	"github.com/hurbbiee/todo-list-backend/internal/modules/users/service"
+	"github.com/hurbbiee/todo-list-backend/internal/modules/user/delivery/http"
+	"github.com/hurbbiee/todo-list-backend/internal/modules/user/repository"
+	"github.com/hurbbiee/todo-list-backend/internal/modules/user/service"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 

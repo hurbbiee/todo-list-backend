@@ -9,6 +9,9 @@ import (
 	"github.com/joho/godotenv"
 )
 
+type RabbitMQConfig struct {
+	URL string
+}
 type DatabaseConfig struct {
 	URL            string
 	ConnectTimeout time.Duration
@@ -22,6 +25,7 @@ type Config struct {
 	JWTSecret    []byte
 	CrossOrigins string
 	Database     DatabaseConfig
+	RabbitMQ     RabbitMQConfig
 }
 
 func Load() (Config, error) {
@@ -47,6 +51,12 @@ func Load() (Config, error) {
 			MaxConnections: 10,
 			MinConnections: 1,
 		},
+		RabbitMQ: RabbitMQConfig{
+			URL: getEnv(
+				"RABBITMQ_URL",
+				"amqp://todo:todo-secret@localhost:5672/",
+			),
+		},
 	}
 
 	jwtSecret := os.Getenv("JWT_SECRET")
@@ -59,6 +69,12 @@ func Load() (Config, error) {
 	}
 
 	cfg.JWTSecret = []byte(jwtSecret)
+
+	if cfg.RabbitMQ.URL == "" {
+		return Config{}, errors.New(
+			"RABBITMQ_URL is required",
+		)
+	}
 
 	return *cfg, nil
 }

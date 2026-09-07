@@ -3,7 +3,7 @@ package repository
 import (
 	"context"
 
-	"github.com/hurbbiee/todo-list-backend/internal/modules/users/dto"
+	"github.com/hurbbiee/todo-list-backend/internal/modules/user/dto"
 )
 
 type UserRepository interface {

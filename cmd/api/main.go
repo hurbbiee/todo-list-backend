@@ -9,8 +9,10 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/hurbbiee/todo-list-backend/internal/config"
 	authRegister "github.com/hurbbiee/todo-list-backend/internal/modules/auth"
-	userRegister "github.com/hurbbiee/todo-list-backend/internal/modules/users"
+	todoRegister "github.com/hurbbiee/todo-list-backend/internal/modules/todo"
+	userRegister "github.com/hurbbiee/todo-list-backend/internal/modules/user"
 	db "github.com/hurbbiee/todo-list-backend/internal/platform/database"
+	rabbitmqClient "github.com/hurbbiee/todo-list-backend/internal/platform/rabbitmq"
 	"github.com/hurbbiee/todo-list-backend/internal/shared/response"
 )
 
@@ -38,6 +40,43 @@ func main() {
 		log.Fatal("connect database: ", err)
 	}
 	defer databasePool.Close()
+
+	rabbitConnection, err := rabbitmqClient.NewConnection(
+		cfg.RabbitMQ.URL,
+	)
+	if err != nil {
+		log.Fatal("connect rabbitmq: ", err)
+	}
+	defer func() {
+		if err := rabbitConnection.Close(); err != nil {
+			log.Printf("close rabbitmq: %v", err)
+		}
+	}()
+
+	log.Println("rabbitmq connected")
+
+	rabbitPublisher, err := rabbitmqClient.NewPublisher(
+		rabbitConnection,
+	)
+	if err != nil {
+		log.Printf(
+			"create rabbitmq publisher: %v",
+			err,
+		)
+		return
+	}
+
+	defer func() {
+		if err := rabbitPublisher.Close(); err != nil {
+			log.Printf(
+				"close rabbitmq publisher: %v",
+				err,
+			)
+		}
+	}()
+
+	log.Println("rabbitmq publisher ready")
+
 	app := fiber.New(fiber.Config{
 		ErrorHandler: func(c *fiber.Ctx, err error) error {
 
@@ -48,7 +87,7 @@ func main() {
 
 	app.Use(cors.New(cors.Config{
 		AllowOrigins: cfg.FrontendURL,
-		AllowMethods: "GET,POST,PUT,DELETE,OPTIONS",
+		AllowMethods: "GET,POST,PUT,DELETE,OPTIONS,PATCH",
 		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
 	}))
 
@@ -61,6 +100,9 @@ func main() {
 
 	authRegister.Register(app, databasePool, &cfg)
 	userRegister.Register(app, databasePool, &cfg)
+	todoRegister.Register(app, databasePool, &cfg, rabbitPublisher)
 
-	app.Listen(":" + cfg.Port)
+	if err := app.Listen(":" + cfg.Port); err != nil {
+		log.Printf("fiber server stopped: %v", err)
+	}
 }

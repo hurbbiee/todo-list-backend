@@ -5,8 +5,8 @@ import (
 	"log"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/hurbbiee/todo-list-backend/internal/modules/users/dto"
-	"github.com/hurbbiee/todo-list-backend/internal/modules/users/service"
+	"github.com/hurbbiee/todo-list-backend/internal/modules/user/dto"
+	"github.com/hurbbiee/todo-list-backend/internal/modules/user/service"
 	"github.com/hurbbiee/todo-list-backend/internal/shared/enum"
 	"github.com/hurbbiee/todo-list-backend/internal/shared/handler"
 	"github.com/hurbbiee/todo-list-backend/internal/shared/helper"

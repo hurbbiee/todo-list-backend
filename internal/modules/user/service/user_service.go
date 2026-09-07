@@ -3,8 +3,8 @@ package service
 import (
 	"context"
 
-	"github.com/hurbbiee/todo-list-backend/internal/modules/users/dto"
-	"github.com/hurbbiee/todo-list-backend/internal/modules/users/repository"
+	"github.com/hurbbiee/todo-list-backend/internal/modules/user/dto"
+	"github.com/hurbbiee/todo-list-backend/internal/modules/user/repository"
 	bcrypt "github.com/hurbbiee/todo-list-backend/internal/platform/security"
 )
 

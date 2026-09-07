@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/hurbbiee/todo-list-backend/internal/modules/users/dto"
+	"github.com/hurbbiee/todo-list-backend/internal/modules/user/dto"
 	"github.com/hurbbiee/todo-list-backend/internal/shared/enum"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"

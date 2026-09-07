@@ -1,6 +1,7 @@
 package http
 
 import (
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/hurbbiee/todo-list-backend/internal/modules/auth/dto"
 	"github.com/hurbbiee/todo-list-backend/internal/modules/auth/service"
@@ -21,7 +22,6 @@ func NewAuthHandler(s *service.AuthService) *AuthHandler {
 
 func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	req := new(dto.AuthRequest)
-
 	// 1. parse request body
 	if err := c.BodyParser(req); err != nil {
 		return response.ErrorJSON(
