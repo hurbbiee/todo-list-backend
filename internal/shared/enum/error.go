@@ -67,5 +67,22 @@ var (
 	}
 )
 
+var (
+	DiscordInvalidSettings = ErrorDef{
+		Code:    3001,
+		Message: "การตั้งค่า Discord ไม่ถูกต้อง",
+	}
+
+	DiscordInvalidWebhookURL = ErrorDef{
+		Code:    3002,
+		Message: "Discord Webhook URL ไม่ถูกต้อง",
+	}
+
+	DiscordConnectionNotFound = ErrorDef{
+		Code:    3003,
+		Message: "ไม่พบการเชื่อมต่อ Discord",
+	}
+)
+
 var ErrEmailAlreadyExists = errors.New("email already exists")
 var ErrUserNotFound = errors.New("user not found")

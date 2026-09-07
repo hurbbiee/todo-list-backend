@@ -9,8 +9,10 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/hurbbiee/todo-list-backend/internal/config"
 	authRegister "github.com/hurbbiee/todo-list-backend/internal/modules/auth"
+	notificationRegister "github.com/hurbbiee/todo-list-backend/internal/modules/notification"
 	todoRegister "github.com/hurbbiee/todo-list-backend/internal/modules/todo"
 	userRegister "github.com/hurbbiee/todo-list-backend/internal/modules/user"
+	"github.com/hurbbiee/todo-list-backend/internal/platform/cryptography"
 	db "github.com/hurbbiee/todo-list-backend/internal/platform/database"
 	rabbitmqClient "github.com/hurbbiee/todo-list-backend/internal/platform/rabbitmq"
 	"github.com/hurbbiee/todo-list-backend/internal/shared/response"
@@ -30,6 +32,13 @@ func main() {
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatal("load config: ", err)
+	}
+
+	webhookCipher, err := cryptography.NewAESGCM(
+		cfg.Security.WebhookEncryptionKey,
+	)
+	if err != nil {
+		log.Fatal("create webhook cipher: ", err)
 	}
 
 	databasePool, err := db.NewPostgres(
@@ -79,7 +88,6 @@ func main() {
 
 	app := fiber.New(fiber.Config{
 		ErrorHandler: func(c *fiber.Ctx, err error) error {
-
 			status, resp := response.FromError(err)
 			return c.Status(status).JSON(resp)
 		},
@@ -101,6 +109,12 @@ func main() {
 	authRegister.Register(app, databasePool, &cfg)
 	userRegister.Register(app, databasePool, &cfg)
 	todoRegister.Register(app, databasePool, &cfg, rabbitPublisher)
+	notificationRegister.Register(
+		app,
+		databasePool,
+		&cfg,
+		webhookCipher,
+	)
 
 	if err := app.Listen(":" + cfg.Port); err != nil {
 		log.Printf("fiber server stopped: %v", err)

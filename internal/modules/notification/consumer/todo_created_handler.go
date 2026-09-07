@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"strings"
 
 	todoEvent "github.com/hurbbiee/todo-list-backend/internal/modules/todo/event"
@@ -15,10 +14,21 @@ var ErrInvalidMessage = errors.New(
 	"invalid rabbitmq message",
 )
 
-type TodoCreatedHandler struct{}
+type TodoCreatedNotifier interface {
+	NotifyTodoCreated(
+		ctx context.Context,
+		event todoEvent.TodoCreated,
+	) error
+}
 
-func NewTodoCreatedHandler() *TodoCreatedHandler {
-	return &TodoCreatedHandler{}
+type TodoCreatedHandler struct {
+	notifier TodoCreatedNotifier
+}
+
+func NewTodoCreatedHandler(
+	notifier TodoCreatedNotifier,
+) *TodoCreatedHandler {
+	return &TodoCreatedHandler{notifier: notifier}
 }
 
 func (h *TodoCreatedHandler) Handle(
@@ -47,19 +57,7 @@ func (h *TodoCreatedHandler) Handle(
 		)
 	}
 
-	// ตอนนี้ log ข้อมูลที่ parse แล้ว
-	// ขั้นต่อไปตรงนี้จะเปลี่ยนเป็นส่ง Discord
-	log.Printf(
-		"todo.created handled: todoId=%d userId=%d title=%q status=%s priority=%s dueAt=%s",
-		event.TodoID,
-		event.UserID,
-		event.Title,
-		event.Status,
-		event.Priority,
-		event.DueAt.Format("2006-01-02 15:04:05Z07:00"),
-	)
-
-	return nil
+	return h.notifier.NotifyTodoCreated(ctx, event)
 }
 
 func validateTodoCreated(

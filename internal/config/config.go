@@ -1,7 +1,9 @@
 package config
 
 import (
+	"encoding/base64"
 	"errors"
+	"fmt"
 	"log"
 	"os"
 	"time"
@@ -9,14 +11,21 @@ import (
 	"github.com/joho/godotenv"
 )
 
+const webhookEncryptionKeySize = 32
+
 type RabbitMQConfig struct {
 	URL string
 }
+
 type DatabaseConfig struct {
 	URL            string
 	ConnectTimeout time.Duration
 	MaxConnections int32
 	MinConnections int32
+}
+
+type SecurityConfig struct {
+	WebhookEncryptionKey []byte
 }
 
 type Config struct {
@@ -26,6 +35,7 @@ type Config struct {
 	CrossOrigins string
 	Database     DatabaseConfig
 	RabbitMQ     RabbitMQConfig
+	Security     SecurityConfig
 }
 
 func Load() (Config, error) {
@@ -39,6 +49,11 @@ func Load() (Config, error) {
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
 		return Config{}, errors.New("DATABASE_URL is required")
+	}
+
+	webhookEncryptionKey, err := loadWebhookEncryptionKey()
+	if err != nil {
+		return Config{}, err
 	}
 
 	cfg := &Config{
@@ -57,6 +72,9 @@ func Load() (Config, error) {
 				"amqp://todo:todo-secret@localhost:5672/",
 			),
 		},
+		Security: SecurityConfig{
+			WebhookEncryptionKey: webhookEncryptionKey,
+		},
 	}
 
 	jwtSecret := os.Getenv("JWT_SECRET")
@@ -71,12 +89,33 @@ func Load() (Config, error) {
 	cfg.JWTSecret = []byte(jwtSecret)
 
 	if cfg.RabbitMQ.URL == "" {
-		return Config{}, errors.New(
-			"RABBITMQ_URL is required",
-		)
+		return Config{}, errors.New("RABBITMQ_URL is required")
 	}
 
 	return *cfg, nil
+}
+
+func loadWebhookEncryptionKey() ([]byte, error) {
+	encodedKey := os.Getenv("WEBHOOK_ENCRYPTION_KEY")
+	if encodedKey == "" {
+		return nil, errors.New("WEBHOOK_ENCRYPTION_KEY is required")
+	}
+
+	key, err := base64.StdEncoding.DecodeString(encodedKey)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"WEBHOOK_ENCRYPTION_KEY must be valid base64: %w",
+			err,
+		)
+	}
+	if len(key) != webhookEncryptionKeySize {
+		return nil, fmt.Errorf(
+			"WEBHOOK_ENCRYPTION_KEY must decode to %d bytes",
+			webhookEncryptionKeySize,
+		)
+	}
+
+	return key, nil
 }
 
 func getEnv(key, fallback string) string {

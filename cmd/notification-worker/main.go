@@ -7,12 +7,19 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/hurbbiee/todo-list-backend/internal/config"
-
 	notificationConsumer "github.com/hurbbiee/todo-list-backend/internal/modules/notification/consumer"
+	"github.com/hurbbiee/todo-list-backend/internal/modules/notification/repository"
+	notificationService "github.com/hurbbiee/todo-list-backend/internal/modules/notification/service"
+	"github.com/hurbbiee/todo-list-backend/internal/platform/cryptography"
+	db "github.com/hurbbiee/todo-list-backend/internal/platform/database"
+	"github.com/hurbbiee/todo-list-backend/internal/platform/discord"
 	rabbitmqClient "github.com/hurbbiee/todo-list-backend/internal/platform/rabbitmq"
 )
+
+const maxRateLimitWait = 30 * time.Second
 
 func main() {
 	ctx, stop := signal.NotifyContext(
@@ -30,6 +37,21 @@ func main() {
 		)
 		return
 	}
+
+	webhookCipher, err := cryptography.NewAESGCM(
+		cfg.Security.WebhookEncryptionKey,
+	)
+	if err != nil {
+		log.Printf("create webhook cipher: %v", err)
+		return
+	}
+
+	databasePool, err := db.NewPostgres(ctx, cfg.Database)
+	if err != nil {
+		log.Printf("connect database: %v", err)
+		return
+	}
+	defer databasePool.Close()
 
 	rabbitConnection, err := rabbitmqClient.NewConnection(
 		cfg.RabbitMQ.URL,
@@ -80,13 +102,17 @@ func main() {
 		return
 	}
 
-	log.Println(
-		"notification worker is waiting for todo.created messages",
+	discordConnectionRepo := repository.NewDiscordConnectionRepoPg(databasePool)
+	discordClient := discord.NewClient(nil)
+	todoCreatedService := notificationService.NewTodoCreatedNotificationService(
+		discordConnectionRepo,
+		webhookCipher,
+		discordClient,
+	)
+	todoCreatedHandler := notificationConsumer.NewTodoCreatedHandler(
+		todoCreatedService,
 	)
 
-	todoCreatedHandler :=
-		notificationConsumer.NewTodoCreatedHandler()
-		
 	log.Println(
 		"notification worker is waiting for todo.created messages",
 	)
@@ -133,6 +159,27 @@ func main() {
 					continue
 				}
 
+				if errors.Is(err, notificationService.ErrPermanentNotification) {
+					if rejectErr := delivery.Reject(false); rejectErr != nil {
+						log.Printf("reject permanent notification: %v", rejectErr)
+					}
+					continue
+				}
+
+				var sendErr *discord.SendError
+				if errors.As(err, &sendErr) {
+					if !sendErr.Retryable {
+						if rejectErr := delivery.Reject(false); rejectErr != nil {
+							log.Printf("reject permanent Discord error: %v", rejectErr)
+						}
+						continue
+					}
+
+					if !waitForRetry(ctx, sendErr.RetryAfter) {
+						return
+					}
+				}
+
 				// Error ชั่วคราว เช่น Discord ล่ม
 				// ตอนนี้ส่งกลับ Queue ก่อน
 				if nackErr := delivery.Nack(
@@ -155,5 +202,24 @@ func main() {
 				)
 			}
 		}
+	}
+}
+
+func waitForRetry(ctx context.Context, delay time.Duration) bool {
+	if delay <= 0 {
+		return true
+	}
+	if delay > maxRateLimitWait {
+		delay = maxRateLimitWait
+	}
+
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+
+	select {
+	case <-ctx.Done():
+		return false
+	case <-timer.C:
+		return true
 	}
 }
